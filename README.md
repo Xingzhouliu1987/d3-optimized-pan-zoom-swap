@@ -8,7 +8,9 @@ Re-usable D3.js pan/zoom rendering code, primarily used for mapping geographic d
 
 Fast Pan, Zoom and Reshade code that retains high frames per second rates for large numbers of nodes (>10.000), using SVG rather than canvas to retain portability and straight forward d3 data binding. This encapsulates a solution that uses css transforms against HTML containers of SVG document fragments for zooming and panning behavior, and uses opacity tweens on layered ```<SVG>``` nodes to render color changes. 
 
-Rasterization is minimized, and should be limited to SVG changes that are not pan,zoom or opacity tweenable, when raster of regions are not yet in memory, or after zoom operation requires image at higher resolution than current bitmap. Hidden layers are retained.
+This is done by minimizing rasterization, which slows down rendering of SVG.
+
+The test html's include scenarios to profile, and rendering should proceed at 50 - 60 fps when bitmap already exist for visible area at or above current scale, and 20-30 fps otherwise.
 
 ```
 fastPanZoom.render()
