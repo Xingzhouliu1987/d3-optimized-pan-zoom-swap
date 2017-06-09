@@ -8,9 +8,8 @@ Re-usable D3.js pan/zoom rendering code, primarily used for mapping geographic d
 
 Fast Pan, Zoom and Reshade code that retains high frames per second rates for large numbers of nodes (>10.000), using SVG rather than canvas to retain portability and straight forward d3 data binding. This encapsulates a solution that uses css transforms against HTML containers of SVG document fragments for zooming and panning behavior, and uses opacity tweens on layered ```<SVG>``` nodes to render color changes. 
 
-This is done by minimizing rasterization, which slows down rendering of SVG.
+This is done by minimizing rasterization, which slows significantly slows down rendering of SVG.
 
-The test html's include scenarios to profile, and rendering should proceed at 50 - 60 fps when bitmap already exist for visible area at or above current scale, and 20-30 fps otherwise.
 
 ```
 fastPanZoom.render()
@@ -75,3 +74,43 @@ fastPanZoom.tDuration([int])
 Sets default duration for transforms. Current swap_visible transform uses this property. Returns currently set value if no argument given.
 
 
+# datalayer.js
+
+Provides a template and convenient wrapper that implements the d3 update > enter > joined > exit data svg/html node data binding flow.
+
+```
+datalayer
+	.efunc(enterFunc)
+	.ofunc(updateFunc)
+	.ufunc(joinedFunc)
+	.xfunc(exitFunc);
+
+function enterFunc(enterSet) {
+	// appends a new element for each data point that does not have an associated rendered node.
+	return enterSet
+		.append("svg:path")
+	...
+
+}
+
+function updateFunc(existingSet) {
+	// applies updates to a node already associated with an existing data point.
+	return existingSet
+		.attr(...)
+		...
+}
+
+function joinedFunc(joinedSet) {
+	// applies changes to all new and existing data mapped nodes.
+	return joinedSet
+		.attr(...)
+		...
+}
+
+function exitFunc(exitSet) {
+	// applies changes to nodes whose associated data points have been removed, before those nodes are removed from the DOM
+	return exitSet
+		.attr(...)
+		...
+}
+```
