@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+    <head>
+<style>
+circle {
+  fill: #ff9900;
+}
+circle.active {
+  fill: #ff0000;
+}
+svg {
+  will-change: transform;
+}
+</style>
+        <script src="lib/d3v4.js"></script>
+        <script src="lib/accessors.js"></script>
+        <script src="lib/d3u.js"></script>
+        <script src="lib/datalayer.js"></script>
+        <script src="lib/fastZoomPan.js"></script>
+    </head>
+    <body>
+        <h1>Hello World</h1>
+        <button id="default">
+          Orange
+        </button>
+        <button id="colorful">
+          Multi-colored
+        </button>        
+<table><tr><td id="left">
+</td></tr>
+<tr><td id="right">
+
+  </td></tr></table>
+
+    
+  	<script>
+  	 	function phyllotaxis(radius, width, height) {
+		  var theta = Math.PI * (3 - Math.sqrt(5));
+		  return function(i) {
+		    var r = radius * Math.sqrt(i), a = theta * i;
+		    return [
+		      width / 2 + r * Math.cos(a),
+		      height / 2 + r * Math.sin(a) + 600
+		    ];
+		  };
+		}
+		var points = d3.range(6000).map(phyllotaxis(30 ,2400 * 2, 2048 * 2));
+  	 
+	 function newnodes(e) {
+
+	  return e.append("svg:circle")
+	          .classed("foo",true)
+	    .attr("cx", function(d) { return 4800 / 2; })
+	    .attr("cy", function(d) { return 4800 / 2; })
+	    .attr("r",0.5)
+	    .on("click", function(d){
+	      console.log("clicked!")
+	    })
+	}
+	function nodeattrs(u) {
+	  return u
+	 //   .transition()
+	 //   .duration(2500)
+	    .attr("cx", function(d) { return d[0]; })
+	    .attr("cy", function(d) { return d[1]; })
+	    .attr("r", 19);
+	}
+	function attrs_no_anim(u) {
+	  return u
+	    .attr("cx", function(d) { return d[0]; })
+	    .attr("cy", function(d) { return d[1]; })
+	    .attr("r", 19);
+	}
+	function remove_nodes(d) {
+	  return d
+	  // .transition()
+	  //  .duration(1)
+	    .attr("cx", 4800 / 2)
+	    .attr("cy", 4800 / 2)
+	    .attr("r",0.5)
+	    .remove()
+	    /*
+	    .transition()
+	    .duration(500)
+	    .attr("opacity",0.0)
+	    .remove();
+	    */
+	}
+var leftnode = fastZoomPan()
+                    .container(d3.select("#left"))
+                    .width(1200)
+                    .height(500)
+                    .id("svgPanelOne")
+                    .bbox(function(points){
+                      return [
+                      [
+                      //min x
+                       0,0
+                      ],
+                      [
+                      //min x
+                       4800,4800
+                      ]                      ]
+                    })
+                    .build(points)
+
+
+var zm;
+leftnode                    
+.setzoom(zm = d3.zoom().scaleExtent([0.25,2]), d3).initialize_view(0.25)
+                  leftnode.wrapper()
+                            .on("click.zoom",null)
+                            .on("dblclick.zoom",null)
+var svgonelayer = dataLayer("leftPanel")
+                    .container(leftnode.svg())
+                    .efunc(newnodes)
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(points)
+
+
+
+ var click_and_anim,dblclick_and_anim;
+ svgonelayer.selection()
+        .on("click",click_and_anim = function(d){
+            
+
+            //d3.event.preventDefault();
+
+            d3.select(this).classed("active",true);
+            var t1 = leftnode.transformTo(d, 1.5),
+                t0 = leftnode.getTransform() ,
+                ix = d3.interpolate(t0.x, t1.x) , 
+                iy = d3.interpolate(t0.y, t1.y) ;
+                ik = d3.interpolate(t0.k, t1.k )
+
+            leftnode.wrapper().transition().duration(2000).call(leftnode.zoom().transform, t1)
+        })
+ svgonelayer.selection()
+        .on("dblclick",dblclick_and_anim = function(d){
+            
+
+            //d3.event.preventDefault();
+
+            d3.select(this).classed("active",true);
+            
+            var t1 = leftnode.transformTo(d, 0.25),
+                t0 = leftnode.getTransform() ,
+                ix = d3.interpolate(t0.x, t1.x) , 
+                iy = d3.interpolate(t0.y, t1.y) ;
+                ik = d3.interpolate(t0.k, t1.k )
+
+            leftnode.wrapper().transition().duration(2000).call(leftnode.zoom().transform, t1)
+})
+
+var svgonelayertwo = dataLayer("leftPanelTwo")
+        .container(leftnode.hidden_layer("multi-colored"))
+        .efunc(newnodes)
+        .ufunc(attrs_no_anim)
+        .xfunc(remove_nodes)
+        .render(points)
+svgonelayertwo.selection()
+        .style("fill",function(d){
+          return d3.schemeCategory20[ Math.floor( Math.random() * 20 ) ];  
+        })
+    d3.select("#default").on("click",function(){
+      leftnode.swap_visible("default",1)
+    })
+    d3.select("#colorful").on("click",function(){
+      leftnode.swap_visible("multi-colored",1)
+    })
+
+var rightnode = fastZoomPan()
+                    .container(d3.select("#right"))
+                    .width(1200)
+                    .height(500)
+                    .id("svgPanelTwo")
+                    .bbox(function(points){
+                      return [
+                      [
+                      //min x
+                       0,0
+                      ],
+                      [
+                      //min x
+                       4800,4800
+                      ]                      ]
+                    })
+                    .build(points)
+var svglayer = dataLayer("rightPanel")
+                    .container(rightnode.svg())
+                    .efunc(newnodes)
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(points)
+
+rightnode.setzoom(d3.zoom().scaleExtent([0.25,2])).initialize_view(0.25)
+
+
+leftnode.zoom().on("zoom.propogate", function() {
+  var t = d3.event.transform;
+      rightnode.wrapper().call(rightnode.zoom().transform,t)
+})
+
+rightnode.wrapper().style("pointer-events","all")
+  	</script>
+    </body>
+</html>
