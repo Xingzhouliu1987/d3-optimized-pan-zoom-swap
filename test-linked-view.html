@@ -109,6 +109,8 @@ leftnode
                   leftnode.wrapper()
                             .on("click.zoom",null)
                             .on("dblclick.zoom",null)
+
+
 var svgonelayer = dataLayer("leftPanel")
                     .pointerEvents("visiblePainted")
                     .container(leftnode.svg())
@@ -127,13 +129,8 @@ var svgonelayer = dataLayer("leftPanel")
             d3.event.preventDefault();
 
             d3.select(this).classed("active",true);
-            var t1 = leftnode.transformTo(d, 1.5),
-                t0 = leftnode.getTransform() ,
-                ix = d3.interpolate(t0.x, t1.x) , 
-                iy = d3.interpolate(t0.y, t1.y) ;
-                ik = d3.interpolate(t0.k, t1.k )
-
-            leftnode.wrapper().transition().duration(2000).call(leftnode.zoom().transform, t1)
+            
+            leftnode.transform(d,1.5)
         })
  svgonelayer.selection()
         .on("dblclick",dblclick_and_anim = function(d){
@@ -144,13 +141,7 @@ var svgonelayer = dataLayer("leftPanel")
 
             d3.select(this).classed("active",true);
             
-            var t1 = leftnode.transformTo(d, 0.25),
-                t0 = leftnode.getTransform() ,
-                ix = d3.interpolate(t0.x, t1.x) , 
-                iy = d3.interpolate(t0.y, t1.y) ;
-                ik = d3.interpolate(t0.k, t1.k )
-
-            leftnode.wrapper().transition().duration(2000).call(leftnode.zoom().transform, t1)
+            leftnode.transform(d,0.25)
 })
 
 var svgonelayertwo = dataLayer("leftPanelTwo")
@@ -194,7 +185,6 @@ var svgrightlayer = dataLayer("rightPanel")
 rightnode.setzoom(zm).initialize_view(0.5)
 
 
-rightnode.wrapper().style("pointer-events","all")
 
 var fakeClick = function(target) {
     var event = document.createEvent('MouseEvents');
