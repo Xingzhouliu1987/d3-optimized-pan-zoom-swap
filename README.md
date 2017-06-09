@@ -32,7 +32,7 @@ Sets the size of the svg element, which is the native size of graphic. Returns c
 fastPanZoom
     .width([int])
     .height([int])
-    ```
+```
 
 Sets the dimensions of the viewport.
 ```
