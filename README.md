@@ -2,7 +2,7 @@
 
 # Purpose
 
-Re-usable D3.js pan/zoom rendering code, primarily used for mapping geographic data.
+Re-usable D3.js pan/zoom rendering code ported to d3.v4, primarily used for mapping geographic data. The original goal was to create interactive, side-by-side comparison maps containing large numbers of shapes (thousands).
 
 # fastPanZoom.js
 
@@ -78,14 +78,18 @@ Sets default duration for transforms. Current swap_visible transform uses this p
 
 # datalayer.js
 
-Provides a template and convenient wrapper that implements the d3 update > enter > joined > exit data svg/html node data binding flow.
+Provides a template and convenient wrapper that implements the d3 update > enter > joined > exit data svg/html node data binding flow. Also provides convenient references to the current active selection.
 
 ```
-datalayer
+var layer = dataLayer
 	.efunc(enterFunc)
 	.ofunc(updateFunc)
 	.ufunc(joinedFunc)
-	.xfunc(exitFunc);
+	.xfunc(exitFunc)
+	.width(1200)
+	.height(500)
+	.container(Selection)
+	.render(data);
 
 function enterFunc(enterSet) {
 	// appends a new element for each data point that does not have an associated rendered node.
@@ -116,3 +120,17 @@ function exitFunc(exitSet) {
 		...
 }
 ```
+Note: These functions MUST return either a selection or a transition - per the above examples.
+
+```
+layer.selection()
+	.transition()
+	.duration(...)
+	.attr(...)
+```	
+will return the currently active selection.
+
+```
+layer.render(data)
+```
+Applies the update > enter > joined > exit flow using update data set [data].
