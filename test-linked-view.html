@@ -23,8 +23,13 @@ svg {
         <button id="default">
           Orange
         </button>
+
         <button id="colorful">
           Multi-colored
+        </button>
+
+        <button id="doforty">
+          40 Events
         </button>        
 <table><tr><td id="left">
 </td></tr>
@@ -157,6 +162,9 @@ svgonelayertwo.selection()
         .style("fill",function(d){
           return d3.schemeCategory20[ Math.floor( Math.random() * 20 ) ];  
         })
+        .on("click",click_and_anim)
+        .on("dblclick",dblclick_and_anim);
+
     d3.select("#default").on("click",function(){
       leftnode.swap_visible("default",1)
     })
@@ -187,8 +195,37 @@ rightnode.setzoom(zm).initialize_view(0.5)
 
 rightnode.wrapper().style("pointer-events","all")
 
+var fakeClick = function(target) {
+    var event = document.createEvent('MouseEvents');
+    event.initMouseEvent('click');
+    target.dispatchEvent(event);
+};
+var fakeDoubleClick = function(target) {
+    var event = document.createEvent('MouseEvents');
+    event.initMouseEvent('dblclick');
+    target.dispatchEvent(event); 
+}
+var ct = 40,
+    interval,
+    swap = ["multi-colored","default"];
+function pick_random_node_and_click(){
+    if(Math.random() < 0.1) {
+      leftnode.swap_visible(swap[0])
+      swap.push(swap.shift())
+    } else {
+    var n = Math.floor(Math.random()*6000),
+        evt = Math.random() < 0.5 ? fakeClick : fakeDoubleClick;
+      evt(svgonelayer.selection().nodes()[n])
+      if(--ct < 1) interval = clearInterval(interval);
+      console.log(ct)
+    }
+}
 
-
+d3.select("#doforty").on("click",function(){
+    if(interval) return (interval = clearInterval(interval))
+    ct = 40
+    interval = setInterval(pick_random_node_and_click,3500)
+})
   	</script>
     </body>
 </html>
