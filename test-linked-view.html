@@ -122,7 +122,7 @@ var svgonelayer = dataLayer("leftPanel")
  var click_and_anim,dblclick_and_anim;
  svgonelayer.selection()
         .on("click",click_and_anim = function(d){
-            
+            if(leftnode.rendering()) return;
 
             d3.event.preventDefault();
 
@@ -137,7 +137,8 @@ var svgonelayer = dataLayer("leftPanel")
         })
  svgonelayer.selection()
         .on("dblclick",dblclick_and_anim = function(d){
-            
+            // code for please wait popup goes here
+            if(leftnode.rendering()) return;
 
             d3.event.preventDefault();
 
@@ -166,10 +167,10 @@ svgonelayertwo.selection()
         .on("dblclick",dblclick_and_anim);
 
     d3.select("#default").on("click",function(){
-      leftnode.swap_visible("default",1)
+      leftnode.swap_visible("default")
     })
     d3.select("#colorful").on("click",function(){
-      leftnode.swap_visible("multi-colored",1)
+      leftnode.swap_visible("multi-colored")
     })
 
 var rightnode = fastZoomPan()
