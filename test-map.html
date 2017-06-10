@@ -179,7 +179,7 @@ var svgonelayer = dataLayer("leftPanel")
 
             d3.select(this).classed("active",true);
             
-            leftnode.transform(d.centroid,1.5)
+            leftnode.transform(d.centroid,1.5,true)
         })
  svgonelayer.selection()
         .on("dblclick",dblclick_and_anim = function(d){
@@ -190,7 +190,7 @@ var svgonelayer = dataLayer("leftPanel")
 
             d3.select(this).classed("active",true);
             
-            leftnode.transform(d.centroid,0.25)
+            leftnode.transform(d.centroid,0.25,true)
 })
 
 
