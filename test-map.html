@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+    <head>
+<style>
+circle {
+  fill: #ff9900;
+}
+circle.active {
+  fill: #ff0000;
+}
+.active {
+  stroke-color: green;
+}
+svg {
+  will-change: transform;
+}
+</style>
+        <script src="lib/d3v4.js"></script>
+        <script src="lib/accessors.js"></script>
+        <script src="lib/d3u.js"></script>
+        <script src="lib/datalayer.js"></script>
+        <script src="lib/fastZoomPan.js"></script>
+    </head>
+    <body>
+        <h1>2016 vs 2012</h1>
+
+        <button id="doforty">
+          40 Events
+        </button>        
+<table><tr><td id="left">
+</td></tr>
+<tr><td id="right">
+
+  </td></tr></table>
+
+    
+  	<script>
+  	 	function phyllotaxis(radius, width, height) {
+		  var theta = Math.PI * (3 - Math.sqrt(5));
+		  return function(i) {
+		    var r = radius * Math.sqrt(i), a = theta * i;
+		    return [
+		      width / 2 + r * Math.cos(a),
+		      height / 2 + r * Math.sin(a) + 600
+		    ];
+		  };
+		}
+		//var points = d3.range(6000).map(phyllotaxis(30 ,2400 * 2, 2048 * 2));
+  	var projection = d3.geoAlbersUsa()
+                        .scale(1000)
+                        .fitExtent([ [0,0] , [2400, 1800] ]),
+        path = d3.geoPath().projection(projection) , 
+        intColorD = d3.interpolate("white","blue"),
+        intColorR = d3.interpolate("white","red");
+
+   function color(year) {
+    return function(d) {
+      var dtot = d.elections[year].reduce(function(a,b){return a+b},0)
+      if(d.elections[year][0] > d.elections[year][1]) {
+          return intColorD( ( d.elections[year][0] / dtot - d.elections[year][1] / dtot ) / 0.5 )
+      } else {
+          return intColorR( ( d.elections[year][1] / dtot - d.elections[year][0] / dtot ) / 0.5 )
+      }
+     }
+   }
+   function opacity(year) {
+    return function(d) {
+      var dtot = d.elections[year].reduce(function(a,b){return a+b},0)
+      console.log(dtot)
+      return d3.interpolate(0.125,1)( (Math.log(Math.max(0,dtot))-11)/5 )
+     }      
+   }
+	 function newnodes(year) {
+    var clr = color(year),
+        opa = opacity(year);
+    return function(e) {
+	   return e.append("svg:path")
+      .attr("d",function(d){
+        return path(d);
+      })
+      .attr("stroke-width",1)
+      .attr("stroke","#ccc")
+      .attr("fill",clr)
+      .attr("fill-opacity",opa)
+     }
+	}
+	function nodeattrs(u) {
+	  return u;
+	}
+	function remove_nodes(d) {
+	  return d.remove()
+	    /*
+	    .transition()
+	    .duration(500)
+	    .attr("opacity",0.0)
+	    .remove();
+	    */
+	}
+
+d3.json("data/merged.fixed.2.json",function(data) {
+
+var leftnode = fastZoomPan()
+                    .container(d3.select("#left"))
+                    .width(1200)
+                    .height(500)
+                    .id("svgPanelOne")
+                    .bbox([ [0,0] , [2400, 1800] ])
+                    .build(elec)
+
+    //var points = d3.range(6000).map(phyllotaxis(30 ,2400 * 2, 2048 * 2));
+    var projection = d3.geoAlbersUsa()
+                        .scale(1000)
+                        .fitExtent([ [0,0] , [2400, 1800] ],{type:"FeatureCollection",features:
+                          data.counties.map(function(d){ d.type = 
+                            "Feature";
+                            return d;
+                          })}),
+        path = d3.geoPath().projection(projection) , 
+        intColorD = d3.interpolate("white","blue"),
+        intColorR = d3.interpolate("white","red");
+var elec = data.counties.map(function(d){
+  d.centroid = path.centroid(d.geometry);
+  d.path = path(d.geometry)
+
+  return d;
+})
+console.log(elec)
+   function color(year) {
+    return function(d) {
+      var dtot = d.elections[year].reduce(function(a,b){return a+b},0)
+      if(d.elections[year][0] > d.elections[year][1]) {
+          return intColorD( ( d.elections[year][0] / dtot - d.elections[year][1] / dtot ) / 0.25 )
+      } else {
+          return intColorR( ( d.elections[year][1] / dtot - d.elections[year][0] / dtot ) / 0.25 )
+      }
+     }
+   }
+   function newnodes(year) {
+    var clr = color(year);
+    return function(e) {
+     return e.append("svg:path")
+      .attr("d",function(d){
+        return path(d);
+      })
+      .attr("stroke-width",0.5)
+      .attr("stroke","#ccc")
+      .attr("fill",clr)
+     }
+  }
+  function nodeattrs(u) {
+    return u;
+  }
+  function remove_nodes(d) {
+    return d.remove()
+      /*
+      .transition()
+      .duration(500)
+      .attr("opacity",0.0)
+      .remove();
+      */
+  }
+
+var zm;
+leftnode                    
+.setzoom(zm = d3.zoom().scaleExtent([0.25,5]), d3).initialize_view(0.5)
+                  leftnode.wrapper()
+                            .on("click.zoom",null)
+                            .on("dblclick.zoom",null)
+
+
+var svgonelayer = dataLayer("leftPanel")
+                    .pointerEvents("visiblePainted")
+                    .container(leftnode.svg())
+                    .efunc(newnodes(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec)
+
+
+
+ var click_and_anim,dblclick_and_anim;
+ svgonelayer.selection()
+        .on("click",click_and_anim = function(d){
+            if(leftnode.rendering()) return;
+
+            d3.event.preventDefault();
+
+            d3.select(this).classed("active",true);
+            
+            leftnode.transform(d.centroid,1.5)
+        })
+ svgonelayer.selection()
+        .on("dblclick",dblclick_and_anim = function(d){
+            // code for please wait popup goes here
+            if(leftnode.rendering()) return;
+
+            d3.event.preventDefault();
+
+            d3.select(this).classed("active",true);
+            
+            leftnode.transform(d.centroid,0.25)
+})
+
+
+var rightnode = fastZoomPan()
+                    .container(d3.select("#right"))
+                    .width(1200)
+                    .height(500)
+                    .id("svgPanelTwo")
+                    .bbox([ [0,0] , [2400, 1800] ])
+                    .build(elec)
+var svgrightlayer = dataLayer("rightPanel")
+                    .container(rightnode.svg())
+                    .pointerEvents("none")
+                    .efunc(newnodes(1))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec)
+
+rightnode.setzoom(zm).initialize_view(0.5)
+
+
+
+var fakeClick = function(target) {
+    var event = document.createEvent('MouseEvents');
+    event.initMouseEvent('click');
+    target.dispatchEvent(event);
+};
+var fakeDoubleClick = function(target) {
+    var event = document.createEvent('MouseEvents');
+    event.initMouseEvent('dblclick');
+    target.dispatchEvent(event); 
+}
+var ct = 40,
+    interval;
+function pick_random_node_and_click(){
+
+    var n = Math.floor(Math.random()*elec.length),
+        evt = Math.random() < 0.5 ? fakeClick : fakeDoubleClick;
+      evt(svgonelayer.selection().nodes()[n])
+      if(--ct < 1) interval = clearInterval(interval);
+      console.log(ct)
+    
+}
+
+d3.select("#doforty").on("click",function(){
+    if(interval) return (interval = clearInterval(interval))
+    ct = 40
+    interval = setInterval(pick_random_node_and_click,3500)
+})
+
+});
+  	</script>
+    </body>
+</html>
