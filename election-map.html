@@ -8,25 +8,370 @@ circle {
 circle.active {
   fill: #ff0000;
 }
-.active {
-  stroke-color: green;
+.hover-layer {
+	fill-opacity: 0.0,
+	stroke-opacity: 0.0;
+}
+.hover-layer.active {
+	stroke-opacity: 1.0;
 }
 svg {
   will-change: transform;
 }
+table {
+	border-top: 1px solid #232323;
+	border-bottom: 1px solid #232323;
+
+}
 </style>
     <script src="lib/d3v4.js"></script>
-    <script src="lib/accessors.js"></script>
-    <script src="lib/d3u.js"></script>
-    <script src="lib/datalayer.js"></script>
-    <script src="lib/fastZoomPan.js"></script>
-
+    <script src="src/accessors.js"></script>
+    <script src="src/d3u.js"></script>
+    <script src="src/datalayer.js"></script>
+    <script src="src/fastZoomPan.js"></script>
+    <link rel="stylesheet" type="text/css" href="lib/bootstrap.min.css">
 </head>
 <body>
-
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-lg-12" id="app">
+		
+		</div>
+	</div>
+</div>
 <script>
 var w = window.innerWidth * 0.95,
-    h = window.innerHeight * 0.95;
+    h = window.innerHeight * 0.95,
+  	projection = d3.geoAlbersUsa()
+            .scale(1000),
+    intColorD = d3.scaleLog().domain([0.001,0.3]).range(["white","steelblue"]),
+    intColorR = d3.scaleLog().domain([0.001,0.3]).range(["white","red"]),
+    intColorL = d3.scalePow().exponent(2).domain([9,14]).range([0.95,0.5]),
+    path = d3.geoPath().projection(projection),
+    fe;
+
+function colorGap(year) {
+	function setLght(clr,dtot) {
+		var cl = d3.hsl(clr);
+		cl.l = intColorL(Math.log(Math.max(dtot,1)));
+		return cl.toString();
+	}
+	return function(d) {
+	  var dtot = d.elections[year].reduce(function(a,b){return a+b},0)
+	  if(d.elections[year][0] > d.elections[year][1]) {
+		  return setLght( intColorD( ( d.elections[year][0] / dtot - d.elections[year][1] / dtot ) / 0.5 ) , dtot )
+	  } else {
+		  return setLght( intColorR( ( d.elections[year][1] / dtot - d.elections[year][0] / dtot ) / 0.5 ) , dtot )
+	  }
+	 }
+}
+var sw = [];
+function colorSwing(year) {
+	function setLght(clr,dtot) {
+		var cl = d3.hsl(clr);
+		cl.l = intColorL(Math.log(Math.max(dtot,1)));
+		return cl.toString();
+	}
+	return function(d) {
+	  var dtot = d.elections[year].reduce(function(a,b){return a+b},0),
+	  	  dtot1 = d.elections[year+1].reduce(function(a,b){return a+b},0),
+	      cgap = ( d.elections[year][0] / dtot - d.elections[year][1] / dtot ) ,
+	      pgap = ( d.elections[year+1][0] / dtot1 - d.elections[year+1][1] / dtot1 ) ;
+	      sw.push(cgap-pgap);
+	  if(cgap - pgap > 0) {
+		  return setLght( intColorD( (cgap - pgap) * 0.5 ) , dtot )
+	  } else {
+		  return setLght( intColorR( (pgap - cgap) * 0.5 ) , dtot )
+	  }
+	 }
+}
+if(h > w) {
+	d3.select("#app")
+		.append("table")
+		.selectAll("tr")
+		.data(["left","right"])
+		.enter()
+		.append("tr")
+		.each(function(d) {
+
+			d3.select(this)
+				.append("td")
+				.style("width",w * 2)
+				.style("height",h)
+				.attr("id",function(d) {
+					return "panel-"+d;
+				});	
+		
+		});
+fe = [[0,0],[w * 2,h]];
+		
+} else {
+	d3.select("#app")
+		.append("table")
+		.append("tr")
+		.selectAll("td")
+		.data(["left","right"])
+		.enter()
+		.append("td")
+		.style("width",w * 2)
+		.style("height",h * 2)
+		.attr("id",function(d) {
+			return "panel-"+d;
+		});
+fe = [[0,0],[w * 2,h * 2]];
+}
+
+   function newnodes(year,colorfunc) {
+    var clr = colorfunc(year);
+    return function(e) {
+	   return e.append("svg:path")
+      .attr("d",function(d){
+        return path(d);
+      })
+      .attr("stroke-width",1)
+      .attr("stroke","#ccc")
+      .attr("fill",clr);
+     }
+	}
+   function newnodes_hover(year) {
+    return function(e) {
+	   return e.append("svg:path")
+      .attr("d",function(d){
+        return path(d);
+      })
+      .attr("stroke-width",4)
+      .attr("stroke","#ff9900")
+      .attr("fill-opacity",0.0)
+      .attr("stroke-opacity",0.0)
+      .each(function(d) {
+      		d3.select(this).classed("hover-layer-" + d.geo_id,true);
+      })
+      .classed("hover-layer",true);
+     }
+	}
+	function nodeattrs(u) {
+	  return u;
+	}
+	function remove_nodes(d) {
+	  return d.remove()
+	    /*
+	    .transition()
+	    .duration(500)
+	    .attr("opacity",0.0)
+	    .remove();
+	    */
+	}
+var leftnode,rightnode, elec;
+d3.json("data/merged.4.json",function(data) {
+
+elec = data.counties.map(function(d){
+  d.centroid = path.centroid(d.geometry);
+  d.elections = d.elections3;
+  d.type = "Feature";
+  return d;
+});
+states = data.states.map(function(d){
+  d.centroid = path.centroid(d.geometry);
+  d.type = "Feature";
+  return d;
+});
+
+projection.fitExtent(fe,{type:"FeatureCollection",features:elec});
+var hvr_opa = 0.0;
+leftnode = fastZoomPan()
+                    .container(d3.select("#panel-left"))
+                    .width((w > h) ? w * 0.5 : w)
+                    .height((w > h) ? h : h  * 0.5)
+                    .id("svgPanelLeft")
+                    .bbox(fe)
+                    .build(elec);
+rightnode = fastZoomPan()
+                    .container(d3.select("#panel-right"))
+                    .width((w > h) ? w * 0.5 : w)
+                    .height((w > h) ? h : h  *  0.5 )
+                    .id("svgPanelRight")
+                    .bbox(fe)
+                    .build(elec)
+var zm,zm2;
+leftnode                    
+.setzoom(zm = d3.zoom().scaleExtent([0.25,5]), d3)
+						.initialize_view(0.25);
+                  leftnode.wrapper()
+                            .on("click.zoom",null)
+                            .on("dblclick.zoom",null)
+rightnode.setzoom(zm2 = d3.zoom().scaleExtent([0.25,5]))
+						.initialize_view(0.25);
+
+var left_hover_state = dataLayer("leftPanel-hover-state")
+                    .pointerEvents("none")
+                    .container(leftnode.hidden_layer("gap-year-hover-state").style("z-index",199).style("display","block"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(states);
+leftnode.synchronize("gap-year-hover-state")
+		.zoom_render("gap-year-hover-state")
+		.initialize_view(0.25);
+left_hover_state.selection()
+      .each(function(d) {
+      		d3.select(this)
+      			.classed("hover-layer-state",true)
+      			.classed("hover-layer-state-" + d.id,true)
+      			.attr("fill","#fff")
+      			.attr("fill-opacity",hvr_opa);
+      })
+      .attr("stroke","#ffbb00");
+    
+// hover layers
+var left_hover = dataLayer("leftPanel-hover")
+                    .pointerEvents("all")
+                    .container(leftnode.hidden_layer("gap-year-hover").style("z-index",200).style("display","block"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec);
+
+leftnode.synchronize("gap-year-hover")
+		.zoom_render("gap-year-hover")
+		.initialize_view(0.25);
+
+left_hover.selection()
+		.on("mouseover",function(d) {
+      		d3.selectAll(".hover-layer-"+d.geo_id).attr("stroke-opacity",1.0);
+      		d3.selectAll(".hover-layer-state-"+d.stateno)
+      			.attr("stroke-opacity",1.0)
+      			.classed("active",true)
+      			.attr("fill-opacity",0.0);
+      })
+      .on("mouseout",function(d) {
+      		d3.selectAll(".hover-layer-"+d.geo_id)
+      				.attr("stroke-opacity",0.0);
+      		d3.selectAll(".hover-layer-state-"+d.stateno)
+      				.attr("stroke-opacity",0.0)
+      				.classed("active",false)
+      				.attr("fill-opacity",hvr_opa);
+      });
+
+var right_hover_state = dataLayer("rightPanel-hover-state")
+                    .pointerEvents("none")
+                    .container(rightnode.hidden_layer("sw-hover-state").style("z-index",199).style("display","block"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(states);
+rightnode.synchronize("sw-hover-state")
+		.zoom_render("sw-hover-state")
+		.initialize_view(0.25);
+right_hover_state.selection()
+      .each(function(d) {
+      		d3.select(this)
+      			.classed("hover-layer-state",true)
+      			.classed("hover-layer-state-" + d.id,true)
+      			.attr("fill","#fff")
+      			.attr("fill-opacity",hvr_opa);
+      }).attr("stroke","#ffbb00");
+      
+var right_hover = dataLayer("rightPanel-hover")
+                    .pointerEvents("all")
+                    .container(rightnode.hidden_layer("swing-year-hover").style("z-index",200).style("display","block"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec);
+rightnode.synchronize("swing-year-hover")
+		.zoom_render("swing-year-hover")
+		.initialize_view(0.25);
+right_hover.selection()
+		.on("mouseover",function(d) {
+      		d3.selectAll(".hover-layer-"+d.geo_id).attr("stroke-opacity",1.0);
+      		d3.selectAll(".hover-layer-state-"+d.stateno)
+      			.attr("stroke-opacity",1.0)
+      			.classed("active",true)
+      			.attr("fill-opacity",0.0);
+      })
+      .on("mouseout",function(d) {
+      		d3.selectAll(".hover-layer-"+d.geo_id).attr("stroke-opacity",0.0);
+      		d3.selectAll(".hover-layer-state-"+d.stateno)
+      				.attr("stroke-opacity",0.0)
+      				.classed("active",false)
+      				.attr("fill-opacity",hvr_opa);
+      });
+var svgonelayers = [dataLayer("leftPanel-0")
+                    .pointerEvents("visiblePainted")
+                    .container(leftnode.hidden_layer("gap-year-0"))
+                    .efunc(newnodes(0,colorGap))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec),
+                    dataLayer("leftPanel-1")
+                    .pointerEvents("visiblePainted")
+                    .container(leftnode.hidden_layer("gap-year-1"))
+                    .efunc(newnodes(1,colorGap))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec),
+                    dataLayer("leftPanel-2")
+                    .pointerEvents("visiblePainted")
+                    .container(leftnode.hidden_layer("gap-year-2"))
+                    .efunc(newnodes(2,colorGap))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec)];
+var svgtwolayers = [dataLayer("rightPanel-0")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-0"))
+                    .efunc(newnodes(0,colorSwing))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec),
+                    dataLayer("rightPanel-1")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-1"))
+                    .efunc(newnodes(1,colorSwing))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec)];
+
+		leftnode.swap_visible("gap-year-0");
+		rightnode.swap_visible("swing-year-0");
+
+zm2.on("zoom.sync",function() {
+	if(d3.event.sourceEvent && d3.event.sourceEvent.type=="zoom") return
+	var t = d3.event.transform;
+	leftnode.wrapper().call( zm.transform , t );
+	if(t.k > 1.0 && hvr_opa == 0.0) {
+		hvr_opa = 0.65;
+		d3.selectAll(".hover-layer-state:not(.active)")
+			.attr("fill-opacity",hvr_opa);
+		console.log("foo");
+		return
+	}
+	if(t.k <= 1.0 && hvr_opa == 0.65) {
+		hvr_opa = 0.0;
+		d3.selectAll(".hover-layer-state:not(.active)")
+			.attr("fill-opacity",hvr_opa);
+		return		
+	}
+});
+zm.on("zoom.sync",function() {
+	if(d3.event.sourceEvent && d3.event.sourceEvent.type=="zoom") return
+	var t = d3.event.transform;
+	rightnode.wrapper().call( zm2.transform , t );
+	if(t.k > 1.0 && hvr_opa == 0.0) {
+		hvr_opa = 0.65;
+		d3.selectAll(".hover-layer-state:not(.active)")
+			.attr("fill-opacity",hvr_opa);
+		console.log("foo");
+		return
+	}
+	if(t.k <= 1.0 && hvr_opa == 0.65) {
+		hvr_opa = 0.0;
+		d3.selectAll(".hover-layer-state:not(.active)")
+			.attr("fill-opacity",hvr_opa);
+		return		
+	}
+});
+});
 </script>
 
 </body>

@@ -41,8 +41,8 @@ svg {
                         .scale(1000)
                         .fitExtent([ [0,0] , [2400, 1800] ]),
         path = d3.geoPath().projection(projection) , 
-        intColorD = d3.scaleLog().domain([0,0.3])(["white","steelblue"]),
-        intColorR = d3.scaleLog().domain([0,0.3])(["white","red"])
+        intColorD = d3.scaleLog().domain([0.001,0.3])(["white","steelblue"]),
+        intColorR = d3.scaleLog().domain([0.001,0.3])(["white","red"])
 
 
    function color(year) {
