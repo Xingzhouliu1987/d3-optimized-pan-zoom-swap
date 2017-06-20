@@ -51,7 +51,7 @@ function check_resolution_after_zoom(svg,t) {
            tOut;
        
        function forced_layout() {
-              clearTimeout(tOut);
+              if(tOut != null) tOut.stop()
               node.style.display = "none"
               node.clientWidth;
               node.style.display = "block"
@@ -66,14 +66,23 @@ function check_resolution_after_zoom(svg,t) {
        return function() {
               ct = d3.event.transform.k;
               if(ct > kmax) {
-                     clearTimeout(tOut)
-                     
-                     tOut = setTimeout(forced_layout, 300)
-                     
+              	if(tOut==null) {
+              		tOut = d3.timer(forced_layout,300)
+              	} else {
+              		tOut.restart(forced_layout,300)
+              	}
+//                      clearTimeout(tOut)
+//                      tOut = setTimeout(forced_layout, 300)
+//                      
               }
               if( (kmax/ct) > 2 ) {
-              	clearTimeout(tOut)
-              	tOut = setTimeout(forced_layout, 300)
+//               	clearTimeout(tOut)
+//               	tOut = setTimeout(forced_layout, 300)
+              	if(tOut==null) {
+              		tOut = d3.timer(forced_layout,300)
+              	} else {
+              		tOut.restart(forced_layout,300)
+              	}
               }
        }
 }
