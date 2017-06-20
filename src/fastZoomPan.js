@@ -1,10 +1,35 @@
 (function(d3,elem_updater_func,d3utils,window) {
+    var zmstat = {tot:0,n:0,mx:0,mn:0}
+    window.zmstat = zmstat
+	function drawProc(f) {
+	  var requested = false;
+	  return function () {
+	  	var t = d3.event.transform;
+		if (!requested) {
+		  requested = true;
+		  d3.timeout(function (time) {
+			requested = false;
+			f(time,t);
+		  });
+		}
+	  }
+	}
+	function wheelDeltaBound(maxmn) {
+		if(maxmn[0] >= 0) maxmn[0] = -Infinity
+		if(maxmn[1] <= 0) maxmn[1] = Infinity
+		return function (e) {
+			var x = Math.min( Math.max( -e.deltaY * (e.deltaMode ? 120 : 1) / 500 , maxmn[0] ) , maxmn[1] );
+			return x;
+		}
+	}
     function zoomHandler(html_elem) {
-      var tprop = d3utils.transformProp()
-      return function() {
-        var t = d3.event.transform;
+      var tprop = d3utils.transformProp(),
+      	  tprev = 1
+      return drawProc(function(tme,t) {
+        
+		
         return html_elem().style(tprop,'translate3d(' + t.x + 'px,' + t.y + 'px, 0px) scale3d(' + t.k + "," + t.k + ",1)");
-      }
+      })
     }
     function zoomQuickTransitionHandler(svg,t0,t1) {
            var ix = d3.interpolate(t0.x,t1.x),
@@ -19,7 +44,7 @@
     uses 3d transform to trigger gpu acceleration on most browsers
   */
 function check_resolution_after_zoom(svg,t) {
-       var isFfx = /firefox/.test(navigator.userAgent),
+       var isFfx = /firefox/.test(navigator.userAgent) ,
            node = svg.node() ,
            kmax = t.k ,
            ct = t.k ,
@@ -40,9 +65,15 @@ function check_resolution_after_zoom(svg,t) {
        
        return function() {
               ct = d3.event.transform.k;
-              if(ct > kmax ){//|| Math.max(kmax/ct) > 2) {
+              if(ct > kmax) {
                      clearTimeout(tOut)
+                     
                      tOut = setTimeout(forced_layout, 300)
+                     
+              }
+              if( (kmax/ct) > 2 ) {
+              	clearTimeout(tOut)
+              	tOut = setTimeout(forced_layout, 300)
               }
        }
 }
@@ -60,7 +91,9 @@ function fastZoomPan() {
           _wrapper : null, 
           _zoom : null,
           _svgdim : null,
-          __hidden : {}
+          clone_current : false,
+          __hidden : {},
+          wheelspeed : [-10,10]
        }
       var widget = {}
   var dispatcher = d3.dispatch("preswap","postswap")
@@ -136,6 +169,7 @@ function fastZoomPan() {
                       .style("transform-origin","0px 0px 0px")
                       .style("overflow","visible")
                       .style("position","absolute")
+                      .attr("viewBox","0 0 "+params._svgdim.width+ " "+params._svgdim.height)
                       .style("z-index",100)
      return widget;    
   }
@@ -284,6 +318,18 @@ yt = params.height/2-Math.max(Math.min(params._svgdim.height * scale - params.he
     @param { object } a d3.zoom object 
     @return { object } return self for chaining
        */
+  function synchronize(layerName) {
+       widget.wrapper().call( params._zoom.on("zoom."+widget.id().replace("-","_")+layerName.replace("-","_"), zoomHandler( function() { return hidden_layer(layerName); } ) ) )
+       return widget;
+  }
+  widget.synchronize = synchronize;
+  function zoom_render(layerName) {
+      widget.zoom().on("zoom.check_resolution"+widget.id() + layerName,
+                     check_resolution_after_zoom(hidden_layer(layerName) , getTransform()))  ;
+      return widget;
+  
+  };
+  widget.zoom_render = zoom_render;
   function setzoom(zoom) {
       if(!zoom) {
          zoom = d3.zoom().scaleExtent([0.5,5])
@@ -294,6 +340,10 @@ yt = params.height/2-Math.max(Math.min(params._svgdim.height * scale - params.he
           Math.max(params.width , widget.svgdim().width),
           Math.max(params.height , widget.svgdim().height)
       ]]);
+      var wd = wheelDeltaBound(params.wheelspeed)
+      zoom.wheelDelta(function(){
+      		return wd(event);
+      });
       params._zoom = zoom;
       widget.wrapper().call( zoom.on("zoom."+widget.id().replace("-","_"), zoomHandler( widget.svg ) ) )
 
