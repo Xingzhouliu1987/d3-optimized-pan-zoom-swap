@@ -1,0 +1,578 @@
+ii<!DOCTYPE html>
+<html>
+    <head>
+<style>
+circle {
+  fill: #ff9900;
+}
+circle.active {
+  fill: #ff0000;
+}
+.hover-layer {
+	fill-opacity: 0.0,
+	stroke-opacity: 0.0;
+}
+.hover-layer.active {
+	stroke-opacity: 1.0;
+}
+svg {
+  will-change: transform;
+  transform-style: preserve-3d;
+}
+table {
+	border-top: 1px solid #232323;
+	border-bottom: 1px solid #232323;
+
+}
+</style>
+    <script src="lib/d3v4.js"></script>
+    <script src="src/accessors.js"></script>
+    <script src="src/d3u.js"></script>
+    <script src="src/datalayer.js"></script>
+    <script src="src/fastZoomPan.js"></script>
+    <script src="src/qtree2.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="lib/bootstrap.min.css">
+</head>
+<body>
+<div class="container-fluid">
+	<div class="row">
+		<div class="col-lg-12" id="app">
+		
+		</div>
+	</div>
+</div>
+<scr>
+
+<script>
+var w = window.innerWidth * 0.95,
+    h = window.innerHeight * 0.95,
+  	projection = d3.geoAlbersUsa()
+            .scale( 1000 * (w > h ? w * 0.5 : w)/822.014958382284 ),
+    intColorD = d3.scaleLog().domain([0.001,0.3]).range(["white","steelblue"]),
+    intColorR = d3.scaleLog().domain([0.001,0.3]).range(["white","red"]),
+    intColorL = d3.scalePow().exponent(2).domain([9,14]).range([0.95,0.5]),
+    intSizeG = d3.scalePow().exponent(4).domain([5.5,8.5]).range([0,1]).clamp(true),
+    intAngleG = d3.scalePow().exponent(2).domain([0.001,0.6]).range([0,1]).clamp(true),
+    path = d3.geoPath().projection(projection),
+    intColorL2 = d3.scalePow().exponent(2).domain([9,14]).range([0.999,0.975]),
+    fe,
+    qtree;
+if(w > h) {
+	w = w - 200;
+	h = h - 20;
+} else {
+	h = h - 200;
+	w = w - 20;
+}
+function absswng(year) {
+
+	return function(d) { 
+		try {
+			return (d.elections3[year][0]-d.elections3[year][1])-(d.elections3[year+1][0]-d.elections3[year+1][1]) 
+		} catch(err) { 
+			console.log(err) 
+		} 
+	}
+}
+function colorGap(year) {
+	function setLght(clr,dtot) {
+		var cl = d3.hsl(clr);
+		cl.l = intColorL(Math.log(Math.max(dtot,1)));
+		return cl.toString();
+	}
+	return function(d) {
+	  
+	  var dtot = d.elections[year].reduce(function(a,b){return a+b},0);
+	  if(d.elections[year][0] > d.elections[year][1]) {
+		  return setLght( intColorD( ( d.elections[year][0] / dtot - d.elections[year][1] / dtot ) / 0.5 ) , dtot )
+	  } else {
+		  return setLght( intColorR( ( d.elections[year][1] / dtot - d.elections[year][0] / dtot ) / 0.5 ) , dtot )
+	  }
+	 }
+}
+function colorSwing(year,cf) {
+	function setLght(clr,dtot) {
+		var cl = d3.hsl(clr);
+		cl.l = cf(Math.log(Math.max(dtot,1)));
+		return cl.toString();
+	}
+	return function(d) {
+	  var dtot = d.elections[year].reduce(function(a,b){return a+b},0),
+	  	  dtot1 = d.elections[year+1].reduce(function(a,b){return a+b},0),
+	      cgap = ( d.elections[year][0] / dtot - d.elections[year][1] / dtot ) ,
+	      pgap = ( d.elections[year+1][0] / dtot1 - d.elections[year+1][1] / dtot1 ) ;
+	  if(cgap - pgap > 0) {
+		  return setLght( intColorD( (cgap - pgap) * 0.5 ) , dtot )
+	  } else {
+		  return setLght( intColorR( (pgap - cgap) * 0.5 ) , dtot )
+	  }
+	 }
+}
+function newnodes(year,colorfunc,cf) {
+var clr = colorfunc(year,cf);
+return function(e) {
+   return e.append("svg:path")
+  .attr("d",function(d){
+	return path(d);
+  })
+  .attr("stroke-width",0.5)
+  .attr("stroke","#efefef")
+  .attr("fill",clr);
+ }
+}
+function newnodes_hover(year) {
+return function(e) {
+   return e.append("svg:path")
+  .attr("d",function(d){
+	return path(d);
+  })
+  .attr("stroke-width",3)
+  .attr("stroke","#ff9900")
+  .attr("fill-opacity",0.0)
+  .attr("stroke-opacity",0.0)
+  .each(function(d) {
+		d3.select(this).classed("hover-layer-" + d.geo_id,true);
+  })
+  .classed("hover-layer",true);
+ }
+}
+
+function newnodes_grass(year,gdm, wd) {
+var extg;
+var gfunc = d3utils.grassfn.grass(extg = [[gdm[0] * 0.5,gdm[1] * 0.5],gdm],wd,d3utils.functor()),
+    trfunc = d3utils.grassfn.transform(extg,wd,d3utils.functor(),0,0) ;
+return function(e) {
+   return e.append("svg:g")
+   .attr("transform",function(d){
+	return "translate(" + [d.centroid[0] - gdm[0] / 2.0,d.centroid[1]  - gdm[1]] + ")"
+  })
+  .each(function(d){
+	  var dtot = d.elections[year].reduce(function(a,b){return a+b},0),
+	  	  dtot1 = d.elections[year+1].reduce(function(a,b){return a+b},0),
+	      cgap = ( d.elections[year][0] / dtot - d.elections[year][1] / dtot ) ,
+	      pgap = ( d.elections[year+1][0] / dtot1 - d.elections[year+1][1] / dtot1 ) ,
+	      angle = intAngleG( Math.abs(cgap - pgap) * 0.5 ) ,
+	      sze = intSizeG( Math.log(Math.max(1,Math.abs(    
+	      	( d.elections[year][0] - d.elections[year][1] ) - ( d.elections[year+1][0] - d.elections[year+1][1] )
+	      ))) );
+  d3.select(this)
+  .append("svg:path")
+  .attr("d",function(d){
+
+	return gfunc(angle+0.3);
+  })
+  .attr("transform",function(d){
+  		return trfunc(sze * (cgap > pgap ? -1 : 1) )
+  })
+  .attr("fill",colorSwing(0,d3utils.functor(0.65)))
+  })
+  .classed("grass-layer",true);
+ }
+}
+function nodeattrs(u) {
+  return u;
+}
+function remove_nodes(d) {
+  return d.remove()
+	/*
+	.transition()
+	.duration(500)
+	.attr("opacity",0.0)
+	.remove();
+	*/
+}
+
+
+
+/* setup code */
+if(h > w) {
+	d3.select("#app")
+		.append("table")
+		.selectAll("tr")
+		.data(["left","right"])
+		.enter()
+		.append("tr")
+		.each(function(d) {
+
+			d3.select(this)
+				.append("td")
+				.style("width",w)
+				.style("height",function(d,i) {
+					return i == 2 ? 200 : h * 0.5
+				})
+				.attr("id",function(d) {
+					return "panel-"+d;
+				});	
+		
+		});
+fe = [[0,0],[w * 2,h]];
+		
+} else {
+	d3.select("#app")
+		.append("table")
+		.append("tr")
+		.selectAll("td")
+		.data(["left","right","info"])
+		.enter()
+		.append("td")
+		.style("width",function(d,i) {
+			return i == 2 ? 200 : w * 0.5
+		})
+		.style("height",h)
+		.attr("id",function(d) {
+			return "panel-"+d;
+		});
+fe = [[0,0],[w ,h * 2]];
+}
+var tslyr;
+
+var leftnode,rightnode, elec, lpl , rpl,states;
+d3.json("data/merged.4.json",function(data) {
+var mtc = {};
+elec = data.counties.map(function(d){
+  d.elections = d.elections3;
+  d.type = "Feature";
+  if(d.elections3==null) {
+  	
+  	d.elections = [
+  		[d.results["2016"].democrat, d.results["2016"].republican, d.results["2016"].independent],
+  		[d.results["2012"].democrat, d.results["2012"].republican, d.results["2012"].independent],
+  		[d.results["2008"].democrat, d.results["2008"].republican, d.results["2008"].independent]
+  	];
+  
+  }
+  return d;
+})
+.filter(function(d) {
+	var res = !mtc[d.fips];
+	mtc[d.fips] = true;
+	return res;
+});
+states = data.states.map(function(d){
+  d.type = "Feature";
+  return d;
+});
+projection.fitExtent(fe,{type:"FeatureCollection",features:elec});
+elec.map(function(d){
+  d.bds = path.bounds(d.geometry);
+  d.centroid = [(d.bds[0][0] + d.bds[1][0]) * 0.5,
+  				(d.bds[0][1] + d.bds[1][1]) * 0.5]
+  
+  return d;
+});
+
+
+var hvr_opa = 0.0;
+leftnode = fastZoomPan()
+                    .container(d3.select("#panel-left"))
+                    .width((w > h) ? w * 0.5 : w)
+                    .height((w > h) ? h : h  * 0.5)
+//                     .width(w)
+//                     .height(h)
+                    .id("svgPanelLeft")
+                    .bbox(fe)
+                    .build(elec);
+rightnode = fastZoomPan()
+                    .container(d3.select("#panel-right"))
+                     .width((w > h) ? w * 0.5 : w)
+                    .height((w > h) ? h : h  *  0.5 )
+//                     .width(w)
+//                     .height(h)
+                    .id("svgPanelRight")
+                    .bbox(fe)
+                    .build(elec)
+var zm,zm2;
+leftnode
+		.wheelspeed([-0.025, 0.1])              
+		.setzoom(zm = d3.zoom().scaleExtent([0.5,10]), d3)
+						
+						.initialize_view(1);
+                  leftnode.wrapper()
+                            .on("click.zoom",null)
+                            .on("dblclick.zoom",null)
+rightnode
+		.wheelspeed([-0.025, 0.1])
+		.setzoom(zm2 = d3.zoom().scaleExtent([0.5,10]))
+		.initialize_view(1);
+rightnode.wrapper()
+                            .on("click.zoom",null)
+                            .on("dblclick.zoom",null)
+var right_hover = dataLayer("rightPanel-hover")
+                    .pointerEvents("all")
+                    .container(rightnode.hidden_layer("swing-year-hover").style("z-index",200).style("display","block"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec);
+
+rightnode.synchronize("swing-year-hover")
+		.zoom_render("swing-year-hover")
+		.initialize_view(1);
+
+var left_hover = dataLayer("leftPanel-hover")
+                    .pointerEvents("all")
+                    .container(leftnode.hidden_layer("gap-year-hover").style("z-index",200).style("display","block"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec);
+
+leftnode.synchronize("gap-year-hover")
+		.zoom_render("gap-year-hover")
+		.initialize_view(1);
+var mx = 0,my = 0;
+var ptrn = projection.translate(),pscl = projection.scale() / 1000;
+left_hover.selection().each(function(d) { 
+	d3.select(this).node().__joined__ = d3.selectAll(".hover-layer-" + d.geo_id)
+	mx = Math.max(d.centroid[0], mx);
+	my = Math.max(d.centroid[1], mx); 
+})
+// .on("click.move",function(d) {
+// 	leftnode.transform(d.centroid.map(function(d,n){ return d ;
+// 	// + ( n==0 ? leftnode.width() : leftnode.height() )  ;
+// 	// * 2 + ( fe[1][n] / 4 - ( n==0 ? leftnode.width() : leftnode.height() ) * 0.5  ) 
+// 	}), 3, true)
+// });
+right_hover.selection().each(function(d) { 
+	d3.select(this).node().__joined__ = d3.selectAll(".hover-layer-" + d.geo_id)
+});
+qtree = qtree_index().xy(function(d) {
+	return d.centroid;
+})
+.selection(left_hover.selection())
+.extent(fe)
+.build();
+
+var svgonelayers = [dataLayer("leftPanel-0")
+                    .pointerEvents("visiblePainted")
+                    .container(leftnode.hidden_layer("gap-year-0"))
+                    .efunc(newnodes(0,colorGap))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec),
+                    dataLayer("leftPanel-1")
+                    .pointerEvents("visiblePainted")
+                    .container(leftnode.hidden_layer("gap-year-1"))
+                    .efunc(newnodes(1,colorGap))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec),
+                    dataLayer("leftPanel-2")
+                    .pointerEvents("visiblePainted")
+                    .container(leftnode.hidden_layer("gap-year-2"))
+                    .efunc(newnodes(2,colorGap))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec)];
+var statelnsone = dataLayer("leftPanel-states")
+                    .pointerEvents("visiblePainted")
+                    .container(leftnode.hidden_layer("gap-year-states").style("z-index",200).style("display","block"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(states)
+                    .selection()
+                    .attr("stroke-opacity",1.0)
+                    .attr("stroke","#212121")
+                    .attr("stroke-width",1);
+leftnode.synchronize("gap-year-states")
+		.zoom_render("gap-year-states")
+		.initialize_view(1);
+var svgtwolayers = [dataLayer("rightPanel-0")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-0"))
+                    .efunc(newnodes(0,colorSwing,intColorL2))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec).selection().attr("stroke","#ababab"),
+                    dataLayer("rightPanel-1")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-1"))
+                    .efunc(newnodes(1,colorSwing,intColorL2))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec).selection().attr("stroke","#ababab")];
+var statelnstwo = [dataLayer("rightPanel-states")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-0"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(states)
+                    .selection()
+                    .attr("stroke-opacity",1.0)
+                    .attr("stroke","#212121")
+                    .attr("stroke-width",1),
+                    dataLayer("rightPanel-states-1")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-1"))
+                    .efunc(newnodes_hover(0))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(states)
+                    .selection()
+                    .attr("stroke-opacity",1.0)
+                    .attr("stroke","#212121")
+                    .attr("stroke-width",1)];
+var svgtwogrlayers = [dataLayer("rightPanel-1-0")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-0"))
+                    .efunc(newnodes_grass(0,[200,50],2))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec)
+                    .selection()
+                    .attr("fill-opacity",0.8),
+                    dataLayer("rightPanel-1-1")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-1"))
+                    .efunc(newnodes_grass(0,[200,50],2))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec)
+                    .selection()
+                    .attr("fill-opacity",0.8)];
+var svgtwolayersreg = [dataLayer("rightPanel-0")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-0-0"))
+                    .efunc(newnodes(0,colorSwing,intColorL2))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec).selection().attr("stroke","#ababab"),
+                    dataLayer("rightPanel-1")
+                    .pointerEvents("visiblePainted")
+                    .container(rightnode.hidden_layer("swing-year-0-1"))
+                    .efunc(newnodes(1,colorSwing,intColorL2))
+                    .ufunc(nodeattrs)
+                    .xfunc(remove_nodes)
+                    .render(elec).selection().attr("stroke","#ababab")];
+		leftnode.swap_visible("gap-year-0");
+		rightnode.swap_visible("swing-year-0");
+
+var circ_mode = false;
+
+/*
+	synchronizing zoom
+*/
+zm2.on("zoom.sync",function() {
+	// exit out if event started at other - no inf recursion
+	if(d3.event.sourceEvent && d3.event.sourceEvent.type=="zoom") return
+	
+	// take current event transform
+	var t = d3.event.transform;
+	
+	// apply it to other panel
+	leftnode.wrapper().call( zm.transform , t );
+
+});
+zm.on("zoom.sync",function() {
+	if(d3.event.sourceEvent && d3.event.sourceEvent.type=="zoom") return
+	var t = d3.event.transform;
+	rightnode.wrapper().call( zm2.transform , t );
+});
+
+
+// loupe objects for left and right panels
+// create attaches elements to the dom
+// 
+//
+lpl = loupe().zoomPan(leftnode).color("steelblue").create();
+rpl = loupe().zoomPan(rightnode).color("steelblue").create();
+
+	// create func to render loupe, one for each panel
+var slpl = setloupe(lpl,2,d3utils.functor(false)),
+	srpl = setloupe(rpl,2,d3utils.functor(false)),
+	// enter and ext selectns 
+	elms,
+	// tmout event handle
+	tout,
+	// handle to centered node handler
+	cb,
+	// geometries currently inview. supports centroid only due to centered node using find method
+	inviewSw = {} , 
+	inviewSw = {} , 
+	// currently centered geometry
+	centered;
+
+
+	
+	zm.on("zoom.loupe",function() {
+		// show the loupe
+		// func only true when loupe shown
+		//
+		var st = slpl(d3.event),
+			t = d3.event.transform;
+			
+		// get all geoms w/ center w/in loupe when loupe shown
+		//
+		//
+		if(st) {
+			var elemsVs = qtree.incircle([ -(t.x - leftnode.width() * 0.5) / t.k ,-(t.y - leftnode.height() * 0.5) / t.k],
+								lpl.r() / (t.k) )
+			
+			// aggregate count swng totals for inview counties
+			//
+			//
+			d3utils.aggregateResults(elemsVs,absswng(0),["state","name"],inviewSw)
+			if(tout==null) {
+				// identify and highlight centered geom
+				// set a timeout to occur 25ms after last zoom event to prevent thrashing and constant redraws
+				//
+				tout = d3.timer(cb = function() {
+					
+					t = leftnode.getTransform();
+					
+					elms = qtree.find([ -(t.x - leftnode.width() * 0.5) / t.k ,-(t.y - leftnode.height() * 0.5) / t.k] )
+					
+					// expects joined selections - __joined__ should be a selection containing same element in each linked 
+					// layer
+					//
+					try {
+						elms.enter.node().__joined__.attr("stroke-opacity",0.50);
+						elms.exit.node().__joined__.attr("stroke-opacity",0.0);
+						centered = elms.enter
+					} catch(err) {
+						console.log(err);
+				
+					};
+					
+					tout.stop();
+					tout = null;
+				},25);
+			
+			} else {
+				// reset tout if user still moving stuff
+				tout.restart(cb,25)
+			}
+		} else {
+			// if loupe is no longer displayed
+			// stop timeouts
+			// clear all selections
+			// reset elms and inviewSw and centered
+			// *** should fire a custom event here ***
+			// 
+			if(elms) {
+				if(tout) {
+					tout.stop()
+				}
+				left_hover.selection()
+				.each(function() { 
+					d3.select(this).node().__joined__.attr("stroke-opacity",0.0);
+				});
+				elms = null;
+				inviewSw = {} ;
+				centered = null;
+			}
+		}
+	
+	});
+	
+	
+	zm2.on("zoom.loupe",function() {
+		var st = srpl(d3.event);
+	});
+});
+</script>
+
+</body>
