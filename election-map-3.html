@@ -184,6 +184,23 @@ a.lead {
 <script src="lib/bootstrap.min.js"></script>
 
 <script>
+function infobox(node,id,pos) {
+   var res = node.wrapper()
+                  .select("#"+id)
+    if(res.size()==0) {
+      res = node.wrapper()
+                .append("div")
+                .classed("infobox",true)
+                .style("position","absolute")
+                .style("z-index",450)
+                .style("font-size","2vmin")
+    }
+    for(nm in pos) {
+       res
+        .style(nm,pos[nm])
+    }
+    return res;
+}
 function load_done() {
   d3.select(".loader")
     .style("display","none")
@@ -745,7 +762,7 @@ rpl = loupe().zoomPan(rightnode).color("steelblue").size(0.65).rotate(0).create(
 var slpl = setloupe(lpl,2,d3utils.functor(false)),
 	srpl = setloupe(rpl,2,d3utils.functor(false)),
 	// enter and ext selectns 
-	elms,
+	elemsVs = null,
 	// tmout event handle
 	tout,
 	// handle to centered node handler
@@ -769,9 +786,16 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
 		//
 		//
 		if(st) {
-			var elemsVs = qtree.incircle([ -(t.x - leftnode.width() * 0.5) / t.k ,-(t.y - leftnode.height() * 0.5) / t.k],
-								lpl.r() / (t.k) )
-			ve = elemsVs
+      if(elemsVs === null) {
+          d3.selectAll(".infobox")
+            .style("display","block")
+          d3.select("#location-box")
+            .style("display","block")
+      }
+			elemsVs = qtree.incircle([ -(t.x - leftnode.width() * 0.5) / t.k ,-(t.y - leftnode.height() * 0.5) / t.k],
+								lpl.r() / (t.k) );
+			ve = elemsVs;
+
 			// aggregate count swng totals for inview counties
 			//
 			//
@@ -789,6 +813,7 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
 				// identify and highlight centered geom
 				// set a timeout to occur 25ms after last zoom event to prevent thrashing and constant redraws
 				//
+
 				tout = d3.timer(cb = function() {
 					
 					t = leftnode.getTransform();
@@ -803,6 +828,16 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
 					try {
 						if(enodes && (centered = enodes.__data__)) enodes.__joined__.attr("stroke-opacity",0.50);
 						if(xnodes) xnodes.__joined__.attr("stroke-opacity",0.0);
+            var ctyname;
+            locbox.text( tx = (centered != null? ( ( ctyname = centered.name + (centered.state=="LA"? " Parish" : " County") ) + ", " + centered.state + " and surrounding" ) : "") )
+            infoleftnames[0].text(ctyname)
+            inforightnames[0].text(ctyname)  
+            var rgtyear = Math.min(curryear,3)
+            infoleftvalues[0].text(d3.format(",")( centered.elections3[curryear][0]-centered.elections3[curryear][1]) )
+            inforightvalues[0].text(d3.format(",")( (centered.elections3[rgtyear][0]-centered.elections3[rgtyear][1]) 
+               - (centered.elections3[rgtyear+1][0]-centered.elections3[rgtyear+1][1]) ) )  
+            infoleftvalues[1].text(d3.format(",")(inview[curryear].grand.value))
+            inforightvalues[1].text(d3.format(",")(inviewSw[curryear].grand.value))
 					} catch(err) {
 						console.log(err);
 				
@@ -823,7 +858,11 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
 			// reset elms and inviewSw and centered
 			// *** should fire a custom event here ***
 			// 
-			if(elms) {
+			if(elemsVs) {
+    d3.selectAll(".infobox")
+      .style("display","none")
+    d3.select("#location-box")
+      .style("display","none")
 				if(tout) {
 					tout.stop()
 				}
@@ -831,16 +870,14 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
 				.each(function() { 
 					d3.select(this).node().__joined__.attr("stroke-opacity",0.0);
 				});
-				elms = null ;
+				elemsVs = null ;
         inview = [{},{},{},{},{}];
         inviewSw = [{},{},{},{}]; 
 				centered = null;
         qtree.clear()
 			}
 		} 
-    
-    locbox.text( tx = (centered != null? ( centered.name + (centered.state=="LA"? " Parish" : " County") + ", " + centered.state + " and surrounding" ) : "") )
-    
+
 	});
 	
 	
@@ -857,6 +894,7 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
           .classed("active",false)
         d3.select("#year-2016")
           .classed("active",true)
+        curryear = 0;
     });
   d3.select("#year-2012")
     .on("click",function(){
@@ -866,6 +904,7 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
           .classed("active",false)
         d3.select("#year-2012")
           .classed("active",true)
+        curryear = 1;
     });
   d3.select("#year-2008")
     .on("click",function(){
@@ -875,6 +914,7 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
           .classed("active",false)
         d3.select("#year-2008")
           .classed("active",true)
+        curryear = 2;
     })
   d3.select("#year-2004")
     .on("click",function(){
@@ -884,6 +924,7 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
           .classed("active",false)
         d3.select("#year-2004")
           .classed("active",true)
+        curryear = 3;  
     })
   d3.select("#year-2000")
     .on("click",function(){
@@ -893,7 +934,45 @@ var slpl = setloupe(lpl,2,d3utils.functor(false)),
           .classed("active",false)
         d3.select("#year-2000")
           .classed("active",true)
+        curryear = 4;
     })
+    var infoleft, inforight;
+    if(w > h) {
+    infoleft = [infobox(leftnode,"left-box-1",{bottom: "10vh",left: "10vw",width:"10vw"}),
+                    infobox(leftnode,"left-box-2",{bottom: "10vh",left: "20vw",width:"10vw"}),
+                    infobox(leftnode,"left-box-3",{bottom: "10vh",left: "30vw",width:"10vw"})];
+    inforight =[infobox(rightnode,"right-box-1",{bottom: "10vh",left: "30vw",width:"10vw"}),
+                    infobox(rightnode,"right-box-2",{bottom: "10vh",left: "20vw",width:"10vw"}),
+                    infobox(rightnode,"right-box-3",{bottom: "10vh",left: "10vw",width:"10vw"})];
+
+    } else {
+      infoleft = [infobox(leftnode,"left-box-1",{bottom: "45vmin",left: "62.5vw",width:"15vmin"}),
+                      infobox(leftnode,"left-box-2",{bottom: "30vmin",left: "62.5vw",width:"15vmin"}),
+                      infobox(leftnode,"left-box-3",{bottom: "15vmin",left: "62.5vw",width:"15vmin"})];
+      inforight =[infobox(rightnode,"right-box-1",{bottom: "15vmin",left: "62.5vw",width:"15vmin"}),
+                      infobox(rightnode,"right-box-2",{bottom: "30vmin",left: "62.5vw",width:"15vmin"}),
+                      infobox(rightnode,"right-box-3",{bottom: "45vmin",left: "62.5vw",width:"15vmin"})];      
+    }
+    var namef,valuef;
+
+    var infoleftnames = infoleft.map(namef = function(elem,i){
+        return elem
+          .append("h3")
+          .classed("lead",true)
+    }),
+    infoleftvalues = infoleft.map(valuef = function(elem,i){
+        return elem
+          .append("p")
+          .classed("main",true)
+    }),
+    inforightnames = inforight.map(namef),
+    inforightvalues = inforight.map(valuef);
+    infoleftnames[1].text("In View")
+    inforightnames[1].text("In View")
+    d3.selectAll(".infobox")
+      .style("display","none")
+    var yearlbls = ["2016","2012","2008","2004","2000"]
+
 });
 </script>
 
