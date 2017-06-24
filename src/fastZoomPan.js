@@ -344,10 +344,10 @@ yt = params.height/2-Math.max(Math.min(params._svgdim.height * scale - params.he
          zoom = d3.zoom().scaleExtent([0.5,5])
       }
       zoom.translateExtent([[
-          0,0
+          -60,-60
         ],[
-          Math.max(params.width , widget.svgdim().width),
-          Math.max(params.height , widget.svgdim().height)
+          Math.max(params.width , widget.svgdim().width)+60,
+          Math.max(params.height , widget.svgdim().height)+60
       ]]);
       var wd = wheelDeltaBound(params.wheelspeed)
       zoom.wheelDelta(function(){

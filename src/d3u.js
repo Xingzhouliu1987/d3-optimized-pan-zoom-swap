@@ -174,7 +174,7 @@ function A(r,dest,inv) {
     
 } 
   var functor = function(val) {
-  		return val === undefined ? function(x) { return x; } : function() { return val; }
+  		return val === undefined ? function(x) { return x; } : (typeof(val) === "function" ? val : function() { return val; })
   };
 function attrGetter(attr_name, applyf) {
 	applyf = applyf && applyf.type == "function" ? applyf : functor();
@@ -182,7 +182,11 @@ function attrGetter(attr_name, applyf) {
 		return applyf(d[attr_name])
 	}
 }
-function aggregateResults(eo, valuefunc, keyfuncs , totals) {
+function mapReduce(node, mapfunc, reducefunc, initialValue) {
+	node.values = node.values.mapfunc(mapfunc).reduce(reducefunc,functor(initialValue || function(key){ return {key: key, value : 0} })(node.key))
+	return node
+}
+function aggregateResults(eo, valuefunc, initialValue, keyfuncs, totals) {
 	var nst = d3.nest();
 	
 		keyfuncs.map(function(p) {
@@ -193,7 +197,62 @@ function aggregateResults(eo, valuefunc, keyfuncs , totals) {
 		.rollup(function(d){ 
 		 	try { return valuefunc(d[0]) } catch(err) { return 0; }
 		 });
-		var entr = {},ext = {};
+	   var entr = {},ext = {};
+	   var ns = nst
+		.entries(eo.enter.data())
+		.map(function(nest) {
+			nest.enter = 1
+			nest = mapReduce(nest,function(d) { d.enter=1; return d; },reducefunc,initialValue(nest.key))
+			if(entr[nest.key] == null) {
+				entr[nest.key] = nest
+			} else {
+				entr[nest.key] = reducefunc(entr[nest.key],nest)
+			}
+			return nest
+		})
+
+	   nst
+		.entries(eo.exit.data())
+		.map(function(nest) {
+			nest.enter = 0;
+			nest = mapReduce(nest,function(d) { d.enter=0; return d; },reducefunc,initialValue(nest.key))
+			if(ext[nest.key] == null) {
+				 ext[nest.key] = nest
+			} else {
+				 ext[nest.key] = reducefunc(ext[nest.key],nest,true)
+			}
+			return nest
+		})
+		if(totals["grand"] == null) totals["grand"] = initialValue("grand")
+		for(nm in ext) {
+			if(totals[nm]==null) continue;
+			totals[nm].value = totals[nm].value - ext[nm]
+			totals["grand"].value -= ext[nm]
+		}
+		for(nm in entr) {
+			if(totals[nm] == null) totals[nm] = initialValue(nm)
+			totals[nm].value = totals[nm].value + entr[nm]
+			totals["grand"].value += entr[nm]
+		}
+		for(nm in totals) {
+			if(Math.abs(totals[nm].value) <= 0 && nm != "grand") {
+				delete totals[nm];
+			}
+		}
+		return totals;	
+}
+function aggregateResults(eo, valuefunc, keyfuncs, totals) {
+	var nst = d3.nest();
+	
+		keyfuncs.map(function(p) {
+			nst.key(p.type=="function" ? p : attrGetter(p))
+		})
+		
+		nst
+		.rollup(function(d){ 
+		 	try { return valuefunc(d[0]) } catch(err) { return 0; }
+		 });
+	   var entr = {},ext = {};
 	   var ns = nst
 		.entries(eo.enter.data())
 		.map(function(nest) {
@@ -226,6 +285,7 @@ function aggregateResults(eo, valuefunc, keyfuncs , totals) {
 		})
 		if(totals["grand"] == null) totals["grand"] = {key:"grand",value:0};
 		for(nm in ext) {
+			if(totals[nm]==null) continue;
 			totals[nm].value = totals[nm].value - ext[nm]
 			totals["grand"].value -= ext[nm]
 		}

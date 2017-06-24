@@ -8,65 +8,127 @@ function loupe() {
    var params = {
       zoomPan:null,
 	  size : 0.75,
-	  _svg : null,
+	  _svg : d3.select(null),
+    _par : d3.select(null),
 	  _dim : {},
 	  _r : null,
 	  color : "#ff9900",
-	  background : "#fefefe"
+	  background : "#fefefe",
+    rotate : 0
    }
    var widget = {}
    
    elem_updater_func(params, widget, {});
    
    function create() {
+      var data  = [{}];
    		params._par = params.zoomPan.wrapper()
+          .selectAll("svg.loupe")
+          .data(data)
+          .enter()
    			  .append("svg")
-              .style("display","none")
-              .attr("version","1.1")
-              .attr("xmlns", "http://www.w3.org/2000/svg")
-              .attr("width", params.zoomPan.width() + 10)
-              .attr("height", params.zoomPan.height() + 10)
-              .attr("id", params.zoomPan.id() + "-loupe")
-              .attr("data-layer-name","loupe" + params.zoomPan.id().replace("-",""))
-              .style("transform-origin","0px 0px 0px")
-              .style("overflow","visible")
-              .style("position","absolute")
-              .style("z-index",250)
+          .classed("loupe",true)
+          .merge(params._par)
+
+      params._par
+          .style("display","none")
+          .attr("version","1.1")
+          .attr("xmlns", "http://www.w3.org/2000/svg")
+          .attr("width", params.zoomPan.width() + 10)
+          .attr("height", params.zoomPan.height() + 10)
+          .attr("id", params.zoomPan.id() + "-loupe")
+          .attr("data-layer-name","loupe" + params.zoomPan.id().replace("-",""))
+          .style("transform-origin","0px 0px 0px")
+          .style("overflow","visible")
+          .style("position","absolute")
+          .style("z-index",250)
+
             
         params._svg = params._par
+              .selectAll("#"+params.zoomPan.id() + "-loupe-g")
+              .data(data)
+              .enter()
               .append("g")
-              .classed("loupe-container",true)
+              .attr("id",params.zoomPan.id() + "-loupe-g")
+              .merge(params._svg)             
+
         var r,cx;
-        params._svg.append("path")
+        params._circle_port = params._svg
+                .selectAll("path.circle-port")
+                .data(data)
+                .enter()
+                .append("path")
+                .classed("circle-port",true)
+                .merge(params._svg.selectAll("path.circle-port").data(data))
+
+        params._circle_port
         	.attr("d",d3utils.enscrCircle(
-        			r = Math.min(params.zoomPan.width()+10,params.zoomPan.height()+10) * params.size * 0.5,
+        			r = Math.min(params.zoomPan.width() + 10,params.zoomPan.height() + 10) * params.size * 0.5,
         			[[0,0],[params.zoomPan.width() + 10,params.zoomPan.height() + 10]],
         			cx = [params.zoomPan.width()/2.0 + 5,params.zoomPan.height()/2.0 + 5]))
-        			.attr("fill",params.background)
-        			.attr("fill-opacity",0.95)
-        			
-        params._svg.append("circle")
+        	.attr("fill",params.background)
+        	.attr("fill-opacity",0.95)
+        
+        params._circle_stroke = params._svg
+          .selectAll("circle.circle-stroke")
+          .data(data)
+          .enter()
+          .append("circle")
+          .classed("circle-stroke",true)
+          .merge(params._svg.selectAll("circle.circle-stroke").data(data))
+
+        params._circle_stroke
         	.attr("r",r+2)
         	.attr("cx",cx[0])
         	.attr("cy",cx[1])
         	.attr("stroke",params.color)
         	.attr("stroke-width",8)
         	.attr("fill-opacity",0.0)
-        params._svg.append("defs")
+
+        params._defs = params._par
+              .selectAll("defs")
+              .data([{}])
+              .enter()
+              .append("defs")
+              .merge(params._par.selectAll("defs").data(data));
+
+        params._clip_path = params._defs
+              .selectAll("#"+params.zoomPan.id() + "-loupe-sq-clp")
+              .data([{}])
+              .enter()  
         			.append("clipPath")
         			.attr("id",params.zoomPan.id() + "-loupe-sq-clp")
+              .merge(params._defs.selectAll("#"+params.zoomPan.id() + "-loupe-sq-clp").data(data));
+
+        params._clip_path_rect = params._clip_path
+              .selectAll("rect")
+              .data(data)
+              .enter()       
         			.append("rect")
-        			.attr("x",cx[0]+16)
-        			.attr("y",cx[1]+16)
-        			.attr("width",r+8)
-        			.attr("height",r+8)
+              .merge(params._clip_path.selectAll("rect").data(data));
+
+        params._clip_path_rect
+        			.attr("x",cx[0]+10)
+        			.attr("y",cx[1]+10)
+        			.attr("width",r+5)
+        			.attr("height",r+5)
         
-        params._svg.append("path")
+        params._loupe_arrow = params._svg
+              .selectAll("path.loupe-arrow")
+              .data(data)
+              .enter()
+              .append("path")
+              .classed("loupe-arrow",true)
+              .merge(params._svg.selectAll("path.loupe-arrow").data(data))
+
+        params._loupe_arrow
         	.attr("d",d3utils.enscrCircle(r,[cx.map(function(d) {  return d + 5 }),cx.map(function(d) {  return d + r + 5 })],cx))
         			.attr("fill",params.color)
         			.attr("fill-opacity",0.95)
         	.attr("clip-path","url(#"+params.zoomPan.id() + "-loupe-sq-clp)")
-        
+          .attr("transform","rotate("+params.rotate+")")
+          .style("transform-origin",(params.zoomPan.width()/2.0 + 5) + "px " + (params.zoomPan.height()/2.0 + 5)+"px");
+    
       params._r  = r;					
    	  return widget
    
@@ -176,7 +238,8 @@ function qtree_polygon_index() {
    }
    widget.find = find;
    function clear() {
-   	cur = Array(params.selection.length).fill(false)
+   	cur = Array(params.selection.length).fill(false);
+    prev = Array(params.selection.length).fill(false);
    	return widget;
    }
    widget.clear = clear;
