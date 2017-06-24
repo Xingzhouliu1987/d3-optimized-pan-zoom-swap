@@ -41,7 +41,11 @@ function dataLayer(klassname, ___) {
     /*
       applied to existing set ONLY. applied before ufunc and before merged set is constructed.
     */
-    ofunc : function(d, o) { return d; }
+    ofunc : function(d, o) { return d; },
+    /*
+      key function used to match elements with data points
+    */
+    key : null
   }
 
   
@@ -144,7 +148,7 @@ function dataLayer(klassname, ___) {
                 .style("pointer-events", "none");
     var joined = params._elem
           .selectAll(params._selector)
-          .data(data)
+          .data(data, params.key)
 
     // update existing nodes, using ufunc
     existing = params.ofunc(joined, layer)
